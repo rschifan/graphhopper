@@ -31,7 +31,7 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
 
     @Override
     public double getTurnCost(long flag) {
-        return 10;
+        return 0;
     }
 
 
@@ -114,10 +114,6 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
         return flags;
     }
 
-    @Override
-    public String toString() {
-        return "happymaps";
-    }
 
     private void loadCustomWeights() {
         System.out.println("loadCustomWeights");
@@ -195,4 +191,13 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
     public Map<Long, Map<String, Double>> getCustomWeights() {
         return wayid2weights;
     }
+
+
+    @Override
+    public String toString() {
+        return "run-happymaps";
+    }
+
+
+
 }
