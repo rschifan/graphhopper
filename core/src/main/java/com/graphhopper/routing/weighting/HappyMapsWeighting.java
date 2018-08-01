@@ -17,7 +17,7 @@ public class HappyMapsWeighting extends AbstractWeighting {
 
         happymapsFlagEncoder = (HappyMapsFlagEncoder) flagEncoder;
 
-        logger.info("\n\n\n\nHappyMapsWeighting: create\n\n\n\n");
+        logger.info("HappyMapsWeighting: create new instance");
 
     }
 

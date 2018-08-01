@@ -122,7 +122,7 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
 
         try {
 
-            File inputF = new File("data/london_happy_maps_norms.csv");
+            File inputF = new File("data/weights/london_happy_maps_norms.csv");
             InputStream inputFS = new FileInputStream(inputF);
             BufferedReader br = new BufferedReader(new InputStreamReader(inputFS));
 
@@ -195,7 +195,7 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
 
     @Override
     public String toString() {
-        return "run-happymaps";
+        return "runhappymaps";
     }
 
 

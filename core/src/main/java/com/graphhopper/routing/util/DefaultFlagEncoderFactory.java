@@ -24,9 +24,13 @@ import com.graphhopper.util.PMap;
  *
  * @author Peter Karich
  */
+
+
 public class DefaultFlagEncoderFactory implements FlagEncoderFactory {
+
     @Override
     public FlagEncoder createFlagEncoder(String name, PMap configuration) {
+
         if (name.equals(GENERIC))
             return new DataFlagEncoder(configuration);
 
@@ -56,6 +60,9 @@ public class DefaultFlagEncoderFactory implements FlagEncoderFactory {
 
         if (name.equals(MOTORCYCLE))
             return new MotorcycleFlagEncoder(configuration);
+
+        if (name.equals(RUNNINGHAPPYMAPS))
+            return new HappyMapsFlagEncoder(configuration);
 
         throw new IllegalArgumentException("entry in encoder list not supported " + name);
     }
