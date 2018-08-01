@@ -67,6 +67,8 @@ import static com.graphhopper.util.Parameters.Algorithms.*;
  * @see GraphHopperAPI
  */
 public class GraphHopper implements GraphHopperAPI {
+
+
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final String fileLockName = "gh.lock";
     private final Set<RoutingAlgorithmFactoryDecorator> algoDecorators = new LinkedHashSet<>();
@@ -119,6 +121,7 @@ public class GraphHopper implements GraphHopperAPI {
     private PathDetailsBuilderFactory pathBuilderFactory = new PathDetailsBuilderFactory();
 
     public GraphHopper() {
+
         chFactoryDecorator.setEnabled(true);
         lmFactoryDecorator.setEnabled(false);
 
@@ -921,10 +924,12 @@ public class GraphHopper implements GraphHopperAPI {
         } else if ("curvature".equalsIgnoreCase(weightingStr)) {
             if (encoder.supports(CurvatureWeighting.class))
                 weighting = new CurvatureWeighting(encoder, hintsMap);
-
         } else if ("short_fastest".equalsIgnoreCase(weightingStr)) {
             weighting = new ShortFastestWeighting(encoder, hintsMap);
+        } else if ("happymaps".equalsIgnoreCase(weightingStr)) {
+            weighting = new HappyMapsWeighting(encoder);
         }
+
 
         if (weighting == null)
             throw new IllegalArgumentException("weighting " + weightingStr + " not supported");
