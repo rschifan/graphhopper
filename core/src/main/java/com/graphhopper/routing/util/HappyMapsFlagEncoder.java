@@ -4,28 +4,88 @@ package com.graphhopper.routing.util;
 import com.graphhopper.reader.ReaderWay;
 import com.graphhopper.util.EdgeIteratorState;
 import com.graphhopper.util.PMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.Arrays;
 
 public class HappyMapsFlagEncoder extends FootFlagEncoder {
-    private final static Logger logger = LoggerFactory.getLogger(HappyMapsFlagEncoder.class);
+//    private final static Logger logger = LoggerFactory.getLogger(HappyMapsFlagEncoder.class);
 
     static final int MAX_NATURE = 3;
 
     protected EncodedDoubleValue natureEncoder;
+    protected EncodedValue highwayEncoder;
 
     private final Map<Long, Map<String, Double>> wayid2weights = new HashMap<>();
-
+    private final Map<String, Integer> highwayMap = new HashMap<>();
 
     public HappyMapsFlagEncoder(PMap configuration) {
         super(configuration);
 
-        loadCustomWeights();
+        // highway and certain tags like ferry and shuttle_train which can be used here (no logical overlap)
+        List<String> highwayList = Arrays.asList(
+                /* reserve index=0 for unset roads (not accessible) */
+                "_default",
+                "motorway", "motorway_link", "motorroad", "trunk", "trunk_link",
+                "primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link",
+                "unclassified", "residential", "living_street", "service", "road", "track",
+                "forestry", "cycleway", "steps", "path", "footway", "pedestrian",
+                "ferry", "shuttle_train");
+        int counter = 0;
+        for (String hw : highwayList) {
+            highwayMap.put(hw, counter++);
+        }
 
+        loadCustomWeights();
+    }
+
+    public String getHighwayString(Integer code){
+
+        String key= null;
+
+        for(Map.Entry entry: highwayMap.entrySet()){
+            if(code.equals(entry.getValue())) {
+                key = (String) entry.getKey();
+                break; //breaking because its one to one map
+            }
+        }
+        return key;
+    }
+
+
+    public int getHighway(EdgeIteratorState edge) {
+        return (int) highwayEncoder.getValue(edge.getFlags());
+    }
+
+    /**
+     * Do not use within weighting as this is suboptimal from performance point of view.
+     */
+    public String getHighwayAsString(EdgeIteratorState edge) {
+        int val = getHighway(edge);
+        for (Map.Entry<String, Integer> e : highwayMap.entrySet()) {
+            if (e.getValue() == val)
+                return e.getKey();
+        }
+        return null;
+    }
+
+    int getHighwayValue(ReaderWay way) {
+        String highwayValue = way.getTag("highway");
+
+        Integer hwValue = highwayMap.get(highwayValue);
+
+        if (way.hasTag("impassable", "yes") || way.hasTag("status", "impassable"))
+            hwValue = 0;
+
+        if (hwValue == null)
+            return 0;
+
+        return hwValue;
     }
 
 
@@ -94,8 +154,10 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
         shift = super.defineWayBits(index, shift);
 
         natureEncoder = new EncodedDoubleValue("Nature", shift, 16, 0.001, 0, MAX_NATURE);
-
         shift += natureEncoder.getBits();
+
+        highwayEncoder = new EncodedValue("highway", shift, 5, 1, 0, highwayMap.size(), true);
+        shift += highwayEncoder.getBits();
 
         return shift;
     }
@@ -105,11 +167,13 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
 
         long flags = super.handleWayTags(way, allowed, relationFlags);
 
-        long wayid = way.getId();
-
-        double nature = this.getCustomWeightByWayId(wayid, "nature");
+        double nature = this.getCustomWeightByWayId(way.getId(), "nature");
 
         flags = natureEncoder.setDoubleValue(flags, nature);
+
+        // HIGHWAY
+        int hwValue = getHighwayValue(way);
+        flags = highwayEncoder.setValue(flags, hwValue);
 
         return flags;
     }
