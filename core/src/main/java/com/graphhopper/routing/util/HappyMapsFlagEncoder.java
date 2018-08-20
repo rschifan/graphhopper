@@ -8,10 +8,7 @@ import com.graphhopper.util.PMap;
 //import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
-import java.util.Arrays;
+import java.util.*;
 
 public class HappyMapsFlagEncoder extends FootFlagEncoder {
 //    private final static Logger logger = LoggerFactory.getLogger(HappyMapsFlagEncoder.class);
@@ -20,6 +17,7 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
 
     protected EncodedDoubleValue natureEncoder;
     protected EncodedValue highwayEncoder;
+    protected EncodedValue wayidEncoder;
 
     private final Map<Long, Map<String, Double>> wayid2weights = new HashMap<>();
     private final Map<String, Integer> highwayMap = new HashMap<>();
@@ -30,12 +28,39 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
         // highway and certain tags like ferry and shuttle_train which can be used here (no logical overlap)
         List<String> highwayList = Arrays.asList(
                 /* reserve index=0 for unset roads (not accessible) */
+
                 "_default",
+
                 "motorway", "motorway_link", "motorroad", "trunk", "trunk_link",
+                "bus_guideway", "escape", "cycleway", "raceway", "bridleway", "proposed", "construction",
+
+
                 "primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link",
                 "unclassified", "residential", "living_street", "service", "road", "track",
-                "forestry", "cycleway", "steps", "path", "footway", "pedestrian",
-                "ferry", "shuttle_train");
+                 "steps", "path", "footway", "pedestrian");
+
+
+//        avoidHighwayTags.add("motorway");
+//        avoidHighwayTags.add("motorway_link");
+//        avoidHighwayTags.add("trunk");
+//        avoidHighwayTags.add("trunk_link");
+//        avoidHighwayTags.add("bus_guideway");
+//        avoidHighwayTags.add("escape");
+//        avoidHighwayTags.add("cycleway");
+//        avoidHighwayTags.add("raceway");
+//        avoidHighwayTags.add("bridleway");
+//        avoidHighwayTags.add("proposed");
+//        avoidHighwayTags.add("construction");
+//        avoidHighwayTags.add("primary_link");
+//        avoidHighwayTags.add("secondary");
+//        avoidHighwayTags.add("secondary_link");
+//        avoidHighwayTags.add("tertiary");
+//        avoidHighwayTags.add("tertiary_link");
+
+
+//        "forestry", "ferry"
+
+
         int counter = 0;
         for (String hw : highwayList) {
             highwayMap.put(hw, counter++);
@@ -102,13 +127,29 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
     @Override
     public long acceptWay(ReaderWay way) {
         String highwayValue = way.getTag("highway");
-
         if (highwayValue == null) {
+            long acceptPotentially = 0;
 
-            if ((way.hasTag("route", ferries)) ||
-                    (way.hasTag("railway", "platform")) ||
-                    (way.hasTag("man_made", "pier")))
-                return 0;
+            if (way.hasTag("route", ferries)) {
+                String footTag = way.getTag("foot");
+                if (footTag == null || "yes".equals(footTag))
+                    acceptPotentially = acceptBit | ferryBit;
+            }
+
+            // special case not for all acceptedRailways, only platform
+            if (way.hasTag("railway", "platform"))
+                acceptPotentially = acceptBit;
+
+            if (way.hasTag("man_made", "pier"))
+                acceptPotentially = acceptBit;
+
+            if (acceptPotentially != 0) {
+                if (way.hasTag(restrictions, restrictedValues) && !getConditionalTagInspector().isRestrictedWayConditionallyPermitted(way))
+                    return 0;
+                return acceptPotentially;
+            }
+
+            return 0;
         }
 
         String sacScale = way.getTag("sac_scale");
@@ -144,6 +185,53 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
             return 0;
 
         return acceptBit;
+
+
+
+//        String highwayValue = way.getTag("highway");
+//        String motorroad = way.getTag("highway");
+//
+//        if (highwayValue != null) {
+//
+//            if ((way.hasTag("motorroad", "yes")) || (avoidHighwayTags.contains(highwayValue)))
+//                return 0;
+//
+//            // do not get our feet wet, "yes" is already included above
+//            if (isBlockFords() && (way.hasTag("highway", "ford") || way.hasTag("ford")))
+//                return 0;
+//
+//            // check access restrictions
+//            if (way.hasTag(restrictions, restrictedValues) && !getConditionalTagInspector().isRestrictedWayConditionallyPermitted(way))
+//                return 0;
+//
+//            return acceptBit;
+//
+//        }
+//
+//        if (way.hasTag("foot", intendedValues))
+//            return acceptBit;
+//
+//        if (way.hasTag("sidewalk", sidewalkValues))
+//            return acceptBit;
+//
+//
+//        return acceptBit;
+
+
+//        access = https://wiki.openstreetmap.org/wiki/Key:access
+//        restrictions =
+
+//        restrictions [foot, access]
+//        restrictedValues no, emergency, private, military, restricted]
+//        intendedValues[official, permissive, designated, yes]
+
+//        allowed [tertiary_link, unclassified, primary_link, tertiary, living_street, trunk, steps, secondary, path,
+//          residential, road, service, footway, pedestrian, track, secondary_link, trunk_link, cycleway, primary]
+//        avoid [secondary, tertiary_link, primary_link, tertiary, trunk, secondary_link, trunk_link, primary]
+//        safe [path, residential, service, footway, pedestrian, living_street, track, steps]
+
+        // ConditionalOSMTagInspector: removed
+        // PriorityCode - PriorityWeighting: assign priorities to ways => check for next releases
     }
 
 
@@ -158,6 +246,9 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
 
         highwayEncoder = new EncodedValue("highway", shift, 5, 1, 0, highwayMap.size(), true);
         shift += highwayEncoder.getBits();
+
+        wayidEncoder = new EncodedValue("wayid", shift, 32, 1, 0, Integer.MAX_VALUE);
+        shift += wayidEncoder.getBits();
 
         return shift;
     }
@@ -174,6 +265,8 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
         // HIGHWAY
         int hwValue = getHighwayValue(way);
         flags = highwayEncoder.setValue(flags, hwValue);
+        // WAYID
+        flags = wayidEncoder.setValue(flags, way.getId());
 
         return flags;
     }
@@ -234,6 +327,11 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
     public double getNature(EdgeIteratorState edge) {
         long flags = edge.getFlags();
         return natureEncoder.getDoubleValue(flags);
+    }
+
+    public long getWayid(EdgeIteratorState edge) {
+        long flags = edge.getFlags();
+        return wayidEncoder.getValue(flags);
     }
 
 

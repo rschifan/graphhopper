@@ -53,6 +53,9 @@ public class PathDetailsBuilderFactory {
         if (requestedPathDetails.contains(HIGHWAY))
             builders.add(new HighwayDetails(encoder));
 
+        if (requestedPathDetails.contains(WAYID))
+            builders.add(new WayidDetails(encoder));
+
         if (requestedPathDetails.size() != builders.size()) {
             throw new IllegalArgumentException("You requested the details " + requestedPathDetails + " but we could only find " + builders);
         }

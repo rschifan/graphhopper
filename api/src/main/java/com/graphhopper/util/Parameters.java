@@ -199,6 +199,7 @@ public class Parameters {
         public static final String TIME = "time";
         public static final String DISTANCE = "distance";
         public static final String HIGHWAY = "highway";
+        public static final String WAYID = "wayid";
     }
 
     public static final class PT {

@@ -25,8 +25,6 @@ import com.graphhopper.reader.osm.conditional.ConditionalOSMTagInspector;
 import com.graphhopper.reader.osm.conditional.DateRangeParser;
 import com.graphhopper.routing.weighting.TurnWeighting;
 import com.graphhopper.util.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -44,8 +42,8 @@ import java.util.Set;
  * @see EncodingManager
  */
 public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncoder {
+
     protected final static int K_FORWARD = 0, K_BACKWARD = 1;
-    private final static Logger logger = LoggerFactory.getLogger(AbstractFlagEncoder.class);
     /* restriction definitions where order is important */
     protected final List<String> restrictions = new ArrayList<>(5);
     protected final Set<String> intendedValues = new HashSet<>(5);
@@ -477,9 +475,9 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
                     } else {
                         long lastId = way.getNodes().isEmpty() ? -1 : way.getNodes().get(way.getNodes().size() - 1);
                         long firstId = way.getNodes().isEmpty() ? -1 : way.getNodes().get(0);
-                        if (firstId != lastId)
-                            logger.warn("Unrealistic long duration ignored in way with way ID=" + way.getId() + " : Duration tag value="
-                                    + way.getTag("duration") + " (=" + Math.round(duration / 60d) + " minutes)");
+//                        if (firstId != lastId)
+//                            logger.warn("Unrealistic long duration ignored in way with way ID=" + way.getId() + " : Duration tag value="
+//                                    + way.getTag("duration") + " (=" + Math.round(duration / 60d) + " minutes)");
                         durationInHours = 0;
                     }
                 }
