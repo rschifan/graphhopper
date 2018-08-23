@@ -20,7 +20,7 @@ public class HighwayDetails extends AbstractPathDetailsBuilder {
     @Override
     public boolean isEdgeDifferentToLastEdge(EdgeIteratorState edge) {
 
-        int current = encoder.getHighway(edge);
+        int current = encoder.getHighwayType(edge);
 
         if (highway == -1 || highway!=current) {
             highway = current;
@@ -31,6 +31,6 @@ public class HighwayDetails extends AbstractPathDetailsBuilder {
 
     @Override
     public Object getCurrentValue() {
-        return encoder.getHighwayString(new Integer(highway));
+        return encoder.getHighwayTypeString(new Integer(highway));
     }
 }

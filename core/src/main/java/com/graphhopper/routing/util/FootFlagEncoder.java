@@ -70,6 +70,7 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
 
     public FootFlagEncoder(int speedBits, double speedFactor) {
         super(speedBits, speedFactor, 0);
+
         restrictions.addAll(Arrays.asList("foot", "access"));
         restrictedValues.add("private");
         restrictedValues.add("no");
@@ -343,6 +344,7 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
      */
     void collect(ReaderWay way, TreeMap<Double, Integer> weightToPrioMap) {
         String highway = way.getTag("highway");
+
         if (way.hasTag("foot", "designated"))
             weightToPrioMap.put(100d, PREFER.getValue());
 
@@ -362,6 +364,7 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
 
         if (way.hasTag("bicycle", "official") || way.hasTag("bicycle", "designated"))
             weightToPrioMap.put(44d, AVOID_IF_POSSIBLE.getValue());
+
     }
 
     @Override

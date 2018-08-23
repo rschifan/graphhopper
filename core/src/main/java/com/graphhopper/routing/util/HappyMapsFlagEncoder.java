@@ -4,28 +4,57 @@ package com.graphhopper.routing.util;
 import com.graphhopper.reader.ReaderWay;
 import com.graphhopper.util.EdgeIteratorState;
 import com.graphhopper.util.PMap;
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
 
 public class HappyMapsFlagEncoder extends FootFlagEncoder {
-//    private final static Logger logger = LoggerFactory.getLogger(HappyMapsFlagEncoder.class);
 
-    static final int MAX_NATURE = 3;
+    static final int MAX_BEAUTY = 1;
 
-    protected EncodedDoubleValue natureEncoder;
-    protected EncodedValue highwayEncoder;
-    protected EncodedValue wayidEncoder;
+    // Encoders
+    protected EncodedDoubleValue beautyEncoder;
+    protected EncodedValue qualityHighwayEncoder;
+
+    protected EncodedValue highwayTypeEncoder;
+    protected EncodedValue OSMWayIdEncoder;
+
+    // Quality features
+    protected Set<String> sidewalkTypes;
+    protected Set<String> surfaceTypes;
+    protected Set<String> trackType;
+    protected Set<String> crossingTypes;
+
+    protected Set<String> designatedSurfaceTypes;
+    protected Set<String> accessibleSurfaceTypes;
+    protected Set<String> avoidedSurfaceTypes;
+
+    protected Set<String> designatedCrossingTypes;
+    protected Set<String> accessibleCrossingTypes;
+    protected Set<String> avoidedCrossingTypes;
+
 
     private final Map<Long, Map<String, Double>> wayid2weights = new HashMap<>();
     private final Map<String, Integer> highwayMap = new HashMap<>();
+    private final Map<Long, Long> idx2OSMWayId = new HashMap<>();
+    private long idx = 0;
 
     public HappyMapsFlagEncoder(PMap configuration) {
         super(configuration);
 
-        // highway and certain tags like ferry and shuttle_train which can be used here (no logical overlap)
+        // Quality Features
+        initSurfaceProperty();
+        initSidewalkProperty();
+        initTrackTypeProperty();
+        initCrossingProperty();
+
+        // OSM Highway Type Features
+        initOSMHighwayProperty();
+
+        loadCustomWeights();
+    }
+
+    protected void initOSMHighwayProperty(){
         List<String> highwayList = Arrays.asList(
                 /* reserve index=0 for unset roads (not accessible) */
 
@@ -34,31 +63,11 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
                 "motorway", "motorway_link", "motorroad", "trunk", "trunk_link",
                 "bus_guideway", "escape", "cycleway", "raceway", "bridleway", "proposed", "construction",
 
-
                 "primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link",
                 "unclassified", "residential", "living_street", "service", "road", "track",
-                 "steps", "path", "footway", "pedestrian");
+                "steps", "path", "footway", "pedestrian");
 
 
-//        avoidHighwayTags.add("motorway");
-//        avoidHighwayTags.add("motorway_link");
-//        avoidHighwayTags.add("trunk");
-//        avoidHighwayTags.add("trunk_link");
-//        avoidHighwayTags.add("bus_guideway");
-//        avoidHighwayTags.add("escape");
-//        avoidHighwayTags.add("cycleway");
-//        avoidHighwayTags.add("raceway");
-//        avoidHighwayTags.add("bridleway");
-//        avoidHighwayTags.add("proposed");
-//        avoidHighwayTags.add("construction");
-//        avoidHighwayTags.add("primary_link");
-//        avoidHighwayTags.add("secondary");
-//        avoidHighwayTags.add("secondary_link");
-//        avoidHighwayTags.add("tertiary");
-//        avoidHighwayTags.add("tertiary_link");
-
-
-//        "forestry", "ferry"
 
 
         int counter = 0;
@@ -66,53 +75,229 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
             highwayMap.put(hw, counter++);
         }
 
-        loadCustomWeights();
+        // set up allowed, safe, and avoided highway maps
+        String[] avoidHighwayTagsArray = {
+                // Roads
+                "motorway",
+                // Link roads
+                "motorway_link"
+        };
+        String[] allowedHighwayTagsArray = {
+                // Roads
+                "trunk", "primary", "secondary", "tertiary",
+                "unclassified", "residential", "service",
+                // Link roads
+                "trunk_link", "primary_link", "secondary_link", "tertiary_link",
+                // Special road types
+                "living_street", "pedestrian", "track", "bus_guideway", "escape", "raceway", "road",
+                // Paths
+                "footway", "bridleway", "steps", "path", "cycleway",
+                // Lifecycle
+                "proposed", "construction"
+        };
+
+        // Original: [path, residential, service, footway, pedestrian, living_street, track, steps]
+        safeHighwayTags.clear();
+        safeHighwayTags.add("living_street");
+        safeHighwayTags.add("pedestrian");
+        safeHighwayTags.add("footway");
+        safeHighwayTags.add("path");
+        safeHighwayTags.add("track");
+        safeHighwayTags.add("residential");
+
+        allowedHighwayTags.clear();
+        for (String current: allowedHighwayTagsArray)
+            allowedHighwayTags.add(current);
+
+        avoidHighwayTags.clear();
+        for (String current: avoidHighwayTagsArray)
+            avoidHighwayTags.add(current);
     }
 
-    public String getHighwayString(Integer code){
+    final int DEFAULT_CROSSING_SCORE = 0;
+    final int DEFAULT_SURFACE_SCORE = 0;
+    final int DEFAULT_SIDEWALK_SCORE = 0;
+    final int DEFAULT_TRACKTYPE_SCORE = 1;
 
-        String key= null;
+    protected void initSurfaceProperty(){
 
-        for(Map.Entry entry: highwayMap.entrySet()){
-            if(code.equals(entry.getValue())) {
-                key = (String) entry.getKey();
-                break; //breaking because its one to one map
-            }
+        // https://wiki.openstreetmap.org/wiki/Key:surface
+        surfaceTypes = new HashSet<String>(){{
+            // official
+            add("paved");add("unpaved");add("asphalt");add("concrete");
+            add("paving_stones");add("cobblestone");add("sett");
+            add("metal");add("wood");add("compacted");add("fine_gravel");add("gravel");add("pebblestone");
+            add("grass_paver");add("grass");add("dirt");add("earth");add("mud");add("ground");add("sand");
+            // unofficial
+            add("tarmac");add("bricks");add("brick");add("clay");add("grit");add("stone");add("tartan");
+            add("woodchips");add("tiles");
+        }};
+
+        designatedSurfaceTypes = new HashSet<String>(){
+            {
+                add("paved");
+                add("asphalt");
+                add("concrete");
+                add("tarmac");
+                add("metal");
+                add("wood");
+                add("compacted");
+                add("fine_gravel");
+                add("unpaved");
+                add("grass_paver");
+                add("grass");
+                add("earth");
+                add("ground");
+                add("grit");
+            }};
+
+        accessibleSurfaceTypes = new HashSet<String>(){
+            {
+                add("bricks");
+                add("brick");
+                add("stone");
+                add("tartan");
+                add("woodchips");
+                add("tiles");
+                add("pebblestone");
+                add("cobblestone");
+                add("sett");
+            }};
+
+        avoidedSurfaceTypes = new HashSet<String>(){
+            {
+                add("clay");
+                add("gravel");
+                add("mud");
+                add("sand");
+                add("dirt");
+            }};
+    }
+
+    protected void initSidewalkProperty(){
+        // https://wiki.openstreetmap.org/wiki/Key:sidewalk
+        sidewalkTypes = new HashSet<String>(){{
+            // official
+            add("no");add("left");add("right");add("both");
+            add("separate");add("none");add("yes");
+            // unofficial
+            add("shared");
+        }};
+    }
+
+    protected void initTrackTypeProperty(){
+        // https://wiki.openstreetmap.org/wiki/Key:tracktype
+        trackType = new HashSet<String>(){{
+            add("grade1");add("grade2");add("grade3");add("grade4");add("grade5");
+        }};
+    }
+
+    protected void initCrossingProperty(){
+        // https://wiki.openstreetmap.org/wiki/Approved_features/Road_crossings
+        crossingTypes = new HashSet<String>(){{
+            // official
+            add("traffic_signals");add("uncontrolled");add("unmarked");add("island");add("no");
+            // unofficial
+            add("zebra");add("toucan");add("pelican");add("traffic_lights");add("pedestrian_signals");add("yes");
+        }};
+
+        designatedCrossingTypes = new HashSet<String>(){
+            {
+                add("uncontrolled");
+                add("traffic_signals");
+                add("zebra");
+                add("toucan");
+                add("pelican");
+                add("pedestrian_signals");
+            }};
+
+        accessibleCrossingTypes = new HashSet<String>(){
+            {
+                add("unmarked");
+                add("yes");
+                add("island");
+                add("traffic_lights");
+            }};
+
+        avoidedCrossingTypes = new HashSet<String>(){
+            {
+                add("no");
+            }};
+
+
+
+    }
+
+    protected int getSurfaceScore(ReaderWay way){
+        String surface = way.getTag("surface");
+
+        if (surface!=null){
+            if (designatedSurfaceTypes.contains(surface))
+                return 2;
+            if (accessibleSurfaceTypes.contains(surface))
+                return 1;
+            else
+                return 0;
         }
-        return key;
+        return DEFAULT_SURFACE_SCORE;
     }
 
+    protected int getSidewalkScore(ReaderWay way){
+        String sidewalk = way.getTag("sidewalk");
 
-    public int getHighway(EdgeIteratorState edge) {
-        return (int) highwayEncoder.getValue(edge.getFlags());
-    }
-
-    /**
-     * Do not use within weighting as this is suboptimal from performance point of view.
-     */
-    public String getHighwayAsString(EdgeIteratorState edge) {
-        int val = getHighway(edge);
-        for (Map.Entry<String, Integer> e : highwayMap.entrySet()) {
-            if (e.getValue() == val)
-                return e.getKey();
+        // left, right, both, yes, separate, none, no, shared
+        if (sidewalk!=null){
+            if (sidewalk.equalsIgnoreCase("both"))
+                return 2;
+            if ((sidewalk.equalsIgnoreCase("yes")) ||
+                    (sidewalk.equalsIgnoreCase("left")) ||
+                    (sidewalk.equalsIgnoreCase("right")) ||
+                    (sidewalk.equalsIgnoreCase("separate")))
+                return 1;
+            else
+                return 0;
         }
-        return null;
+        return DEFAULT_SIDEWALK_SCORE;
     }
 
-    int getHighwayValue(ReaderWay way) {
-        String highwayValue = way.getTag("highway");
+    protected int getTrackTypeScore(ReaderWay way){
+        String tracktype = way.getTag("tracktype");
 
-        Integer hwValue = highwayMap.get(highwayValue);
-
-        if (way.hasTag("impassable", "yes") || way.hasTag("status", "impassable"))
-            hwValue = 0;
-
-        if (hwValue == null)
-            return 0;
-
-        return hwValue;
+        if (tracktype!=null){
+            if ((tracktype.equalsIgnoreCase("grade1")) ||
+                    (tracktype.equalsIgnoreCase("grade2")))
+                return 2;
+            if ((tracktype.equalsIgnoreCase("grade3")) ||
+                    (tracktype.equalsIgnoreCase("grade4")))
+                return 1;
+            else
+                return 0;
+        }
+        return DEFAULT_TRACKTYPE_SCORE;
     }
 
+    protected int getCrossingScore(ReaderWay way){
+        String crossing = way.getTag("crossing");
+
+        if (crossing!=null){
+            if (designatedCrossingTypes.contains(crossing))
+                return 2;
+            if (accessibleCrossingTypes.contains(crossing))
+                return 1;
+            else
+                return 0;
+        }
+        return DEFAULT_CROSSING_SCORE;
+    }
+
+    protected int getQualityScore(ReaderWay way){
+        int surfaceScore = getSurfaceScore(way);
+        int sidewalkScore = getSidewalkScore(way);
+        int tracktypeScore = getTrackTypeScore(way);
+        int crossingScore = getCrossingScore(way);
+
+        return (surfaceScore+sidewalkScore+tracktypeScore+crossingScore);
+    }
 
     @Override
     public double getTurnCost(long flag) {
@@ -126,8 +311,13 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
      */
     @Override
     public long acceptWay(ReaderWay way) {
+
         String highwayValue = way.getTag("highway");
+
         if (highwayValue == null) {
+
+            // Rules for ways that are not highways
+            // TODO: Disable ferries, trains, and public transportation
             long acceptPotentially = 0;
 
             if (way.hasTag("route", ferries)) {
@@ -186,69 +376,24 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
 
         return acceptBit;
 
-
-
-//        String highwayValue = way.getTag("highway");
-//        String motorroad = way.getTag("highway");
-//
-//        if (highwayValue != null) {
-//
-//            if ((way.hasTag("motorroad", "yes")) || (avoidHighwayTags.contains(highwayValue)))
-//                return 0;
-//
-//            // do not get our feet wet, "yes" is already included above
-//            if (isBlockFords() && (way.hasTag("highway", "ford") || way.hasTag("ford")))
-//                return 0;
-//
-//            // check access restrictions
-//            if (way.hasTag(restrictions, restrictedValues) && !getConditionalTagInspector().isRestrictedWayConditionallyPermitted(way))
-//                return 0;
-//
-//            return acceptBit;
-//
-//        }
-//
-//        if (way.hasTag("foot", intendedValues))
-//            return acceptBit;
-//
-//        if (way.hasTag("sidewalk", sidewalkValues))
-//            return acceptBit;
-//
-//
-//        return acceptBit;
-
-
-//        access = https://wiki.openstreetmap.org/wiki/Key:access
-//        restrictions =
-
-//        restrictions [foot, access]
-//        restrictedValues no, emergency, private, military, restricted]
-//        intendedValues[official, permissive, designated, yes]
-
-//        allowed [tertiary_link, unclassified, primary_link, tertiary, living_street, trunk, steps, secondary, path,
-//          residential, road, service, footway, pedestrian, track, secondary_link, trunk_link, cycleway, primary]
-//        avoid [secondary, tertiary_link, primary_link, tertiary, trunk, secondary_link, trunk_link, primary]
-//        safe [path, residential, service, footway, pedestrian, living_street, track, steps]
-
-        // ConditionalOSMTagInspector: removed
-        // PriorityCode - PriorityWeighting: assign priorities to ways => check for next releases
     }
-
-
 
     @Override
     public int defineWayBits(int index, int shift) {
 
         shift = super.defineWayBits(index, shift);
 
-        natureEncoder = new EncodedDoubleValue("Nature", shift, 16, 0.001, 0, MAX_NATURE);
-        shift += natureEncoder.getBits();
+        beautyEncoder = new EncodedDoubleValue("Nature", shift, 16, 0.001, 0, MAX_BEAUTY);
+        shift += beautyEncoder.getBits();
 
-        highwayEncoder = new EncodedValue("highway", shift, 5, 1, 0, highwayMap.size(), true);
-        shift += highwayEncoder.getBits();
+        highwayTypeEncoder = new EncodedValue("highway", shift, 5, 1, 0, highwayMap.size(), true);
+        shift += highwayTypeEncoder.getBits();
 
-        wayidEncoder = new EncodedValue("wayid", shift, 32, 1, 0, Integer.MAX_VALUE);
-        shift += wayidEncoder.getBits();
+        OSMWayIdEncoder = new EncodedValue("wayid", shift, 24, 1, 0, 8388608);
+        shift += OSMWayIdEncoder.getBits();
+
+        qualityHighwayEncoder = new EncodedValue("quality", shift, 4, 1, 0, 15, true);
+        shift += qualityHighwayEncoder.getBits();
 
         return shift;
     }
@@ -260,17 +405,100 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
 
         double nature = this.getCustomWeightByWayId(way.getId(), "nature");
 
-        flags = natureEncoder.setDoubleValue(flags, nature);
-
+        flags = beautyEncoder.setDoubleValue(flags, nature);
         // HIGHWAY
-        int hwValue = getHighwayValue(way);
-        flags = highwayEncoder.setValue(flags, hwValue);
+        int hwValue = getHighwayType(way);
+        flags = highwayTypeEncoder.setValue(flags, hwValue);
+
         // WAYID
-        flags = wayidEncoder.setValue(flags, way.getId());
+        idx2OSMWayId.put(new Long(idx), new Long(way.getId()));
+        flags = OSMWayIdEncoder.setValue(flags, idx);
+        idx++;
+
+        // QUALITY
+        flags = qualityHighwayEncoder.setValue(flags, getQualityScore(way));
+
 
         return flags;
     }
 
+    void collect(ReaderWay way, TreeMap<Double, Integer> weightToPrioMap) {
+        super.collect(way, weightToPrioMap);
+
+        // TODO modify the priority according to the highways rules defined in the survey
+
+//        String highway = way.getTag("highway");
+//
+//        if (way.hasTag("foot", "designated"))
+//            weightToPrioMap.put(100d, PREFER.getValue());
+//
+//        double maxSpeed = getMaxSpeed(way);
+//        if (safeHighwayTags.contains(highway) || maxSpeed > 0 && maxSpeed <= 20) {
+//            weightToPrioMap.put(40d, PREFER.getValue());
+//            if (way.hasTag("tunnel", intendedValues)) {
+//                if (way.hasTag("sidewalk", sidewalksNoValues))
+//                    weightToPrioMap.put(40d, AVOID_IF_POSSIBLE.getValue());
+//                else
+//                    weightToPrioMap.put(40d, UNCHANGED.getValue());
+//            }
+//        } else if (maxSpeed > 50 || avoidHighwayTags.contains(highway)) {
+//            if (!way.hasTag("sidewalk", sidewalkValues))
+//                weightToPrioMap.put(45d, AVOID_IF_POSSIBLE.getValue());
+//        }
+//
+//        if (way.hasTag("bicycle", "official") || way.hasTag("bicycle", "designated"))
+//            weightToPrioMap.put(44d, AVOID_IF_POSSIBLE.getValue());
+
+    }
+
+    public double getBeautyScore(EdgeIteratorState edge) {
+        long flags = edge.getFlags();
+        return beautyEncoder.getDoubleValue(flags);
+    }
+
+    public long getQualityScore(EdgeIteratorState edge){
+        long flags = edge.getFlags();
+        return qualityHighwayEncoder.getValue(flags);
+    }
+
+    public long getOSMWayId(EdgeIteratorState edge) {
+        long flags = edge.getFlags();
+        long current = OSMWayIdEncoder.getValue(flags);
+        return idx2OSMWayId.get(current);
+    }
+
+    public String getHighwayTypeString(Integer code){
+
+        String key= null;
+
+        for(Map.Entry entry: highwayMap.entrySet()){
+            if(code.equals(entry.getValue())) {
+                key = (String) entry.getKey();
+                break; //breaking because its one to one map
+            }
+        }
+        return key;
+    }
+
+    public int getHighwayType(EdgeIteratorState edge) {
+        return (int) highwayTypeEncoder.getValue(edge.getFlags());
+    }
+
+    private int getHighwayType(ReaderWay way) {
+        String highwayValue = way.getTag("highway");
+
+        Integer hwValue = highwayMap.get(highwayValue);
+
+        if (way.hasTag("impassable", "yes") || way.hasTag("status", "impassable"))
+            hwValue = 0;
+
+        if (hwValue == null)
+            return 0;
+
+        return hwValue;
+    }
+
+    // Weights
 
     private void loadCustomWeights() {
         System.out.println("loadCustomWeights");
@@ -324,33 +552,21 @@ public class HappyMapsFlagEncoder extends FootFlagEncoder {
 
     }
 
-    public double getNature(EdgeIteratorState edge) {
-        long flags = edge.getFlags();
-        return natureEncoder.getDoubleValue(flags);
-    }
-
-    public long getWayid(EdgeIteratorState edge) {
-        long flags = edge.getFlags();
-        return wayidEncoder.getValue(flags);
-    }
-
-
-    public Map<String, Double> getCustomWeightsByWayId(long wayid) {
+    private Map<String, Double> getCustomWeightsByWayId(long wayid) {
         return this.getCustomWeights().get(new Long(wayid));
     }
 
-
-    public Double getCustomWeightByWayId(long wayid, String key) {
+    private Double getCustomWeightByWayId(long wayid, String key) {
 
         Map<String, Double> wayidInfo = this.getCustomWeightsByWayId(wayid);
 
         if (wayidInfo!=null)
             return wayidInfo.get(key);
         else
-            return (double)MAX_NATURE;
+            return (double)0;
     }
 
-    public Map<Long, Map<String, Double>> getCustomWeights() {
+    private Map<Long, Map<String, Double>> getCustomWeights() {
         return wayid2weights;
     }
 

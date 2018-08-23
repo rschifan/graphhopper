@@ -20,7 +20,7 @@ public class WayidDetails extends AbstractPathDetailsBuilder {
     @Override
     public boolean isEdgeDifferentToLastEdge(EdgeIteratorState edge) {
 
-        long current = encoder.getWayid(edge);
+        long current = encoder.getOSMWayId(edge);
 
         if (wayid == -1 || wayid!=current) {
             wayid = current;
