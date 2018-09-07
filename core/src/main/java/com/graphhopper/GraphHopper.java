@@ -909,6 +909,7 @@ public class GraphHopper implements GraphHopperAPI {
      * @see HintsMap
      */
     public Weighting createWeighting(HintsMap hintsMap, FlagEncoder encoder, Graph graph) {
+
         String weightingStr = toLowerCase(hintsMap.getWeighting());
         Weighting weighting = null;
 
@@ -929,7 +930,7 @@ public class GraphHopper implements GraphHopperAPI {
         } else if ("mindful".equalsIgnoreCase(weightingStr)) {
             weighting = new MindfulWeighting(encoder);
         } else if ("vibrant".equalsIgnoreCase(weightingStr)) {
-            weighting = new VibrantWeighting(encoder);
+            weighting = new VibrantWeighting(hintsMap, encoder);
         }
 
         if (weighting == null)

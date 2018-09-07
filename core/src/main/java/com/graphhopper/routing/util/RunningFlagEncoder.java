@@ -419,7 +419,7 @@ public class RunningFlagEncoder extends FootFlagEncoder {
 
     @Override
     public int defineWayBits(int index, int shift) {
-
+        System.out.println("\n\ndefineWayBits\n\n");
         shift = super.defineWayBits(index, shift);
 
         beautyEncoder = new EncodedDoubleValue("Nature", shift, 16, 0.001, 0, MAX_BEAUTY);
@@ -434,17 +434,11 @@ public class RunningFlagEncoder extends FootFlagEncoder {
         qualityHighwayEncoder = new EncodedValue("quality", shift, 4, 1, 0, 15, true);
         shift += qualityHighwayEncoder.getBits();
 
-
-        surfaceHighwayEncoder = new EncodedValue("surface", shift, 3, 1, 0, 7, true);
-        shift += qualityHighwayEncoder.getBits();
-
-
         return shift;
     }
 
     @Override
     public long handleWayTags(ReaderWay way, long allowed, long relationFlags){
-
         long flags = super.handleWayTags(way, allowed, relationFlags);
 
         double nature = this.getCustomWeightByWayId(way.getId(), "nature");
@@ -508,7 +502,8 @@ public class RunningFlagEncoder extends FootFlagEncoder {
     public long getOSMWayId(EdgeIteratorState edge) {
         long flags = edge.getFlags();
         long current = OSMWayIdEncoder.getValue(flags);
-        return idx2OSMWayId.get(current);
+        return current;
+//        return idx2OSMWayId.get(current);
     }
 
     public String getHighwayTypeString(Integer code){
