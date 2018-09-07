@@ -926,10 +926,11 @@ public class GraphHopper implements GraphHopperAPI {
                 weighting = new CurvatureWeighting(encoder, hintsMap);
         } else if ("short_fastest".equalsIgnoreCase(weightingStr)) {
             weighting = new ShortFastestWeighting(encoder, hintsMap);
-        } else if ("happymaps".equalsIgnoreCase(weightingStr)) {
-            weighting = new HappyMapsWeighting(encoder);
+        } else if ("mindful".equalsIgnoreCase(weightingStr)) {
+            weighting = new MindfulWeighting(encoder);
+        } else if ("vibrant".equalsIgnoreCase(weightingStr)) {
+            weighting = new VibrantWeighting(encoder);
         }
-
 
         if (weighting == null)
             throw new IllegalArgumentException("weighting " + weightingStr + " not supported");

@@ -61,8 +61,8 @@ public class DefaultFlagEncoderFactory implements FlagEncoderFactory {
         if (name.equals(MOTORCYCLE))
             return new MotorcycleFlagEncoder(configuration);
 
-        if (name.equals(RUNNINGHAPPYMAPS))
-            return new HappyMapsFlagEncoder(configuration);
+        if (name.equals(RUNNING))
+            return new RunningFlagEncoder(configuration);
 
         throw new IllegalArgumentException("entry in encoder list not supported " + name);
     }
