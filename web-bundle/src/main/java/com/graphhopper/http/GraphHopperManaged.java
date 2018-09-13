@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.graphhopper.GraphHopper;
 import com.graphhopper.json.geo.JsonFeatureCollection;
 import com.graphhopper.reader.osm.GraphHopperOSM;
+import com.graphhopper.reader.osm.RunningGraphHopperOSM;
+
 import com.graphhopper.routing.lm.LandmarkStorage;
 import com.graphhopper.routing.util.spatialrules.SpatialRuleLookupHelper;
 import com.graphhopper.util.CmdArgs;
@@ -52,7 +54,12 @@ public class GraphHopperManaged implements Managed {
             logger.error("Problem while reading border map GeoJSON. Skipping this.", e1);
             landmarkSplittingFeatureCollection = null;
         }
-        graphHopper = new GraphHopperOSM(landmarkSplittingFeatureCollection).forServer();
+
+
+//        graphHopper = new GraphHopperOSM(landmarkSplittingFeatureCollection).forServer();
+//        graphHopper = new RunningGraphHopperOSM(landmarkSplittingFeatureCollection).forServer();
+        graphHopper = RunningGraphHopperOSM.getInstance(landmarkSplittingFeatureCollection).forServer();
+
         String spatialRuleLocation = configuration.get("spatial_rules.location", "");
         if (!spatialRuleLocation.isEmpty()) {
             final BBox maxBounds = BBox.parseBBoxString(configuration.get("spatial_rules.max_bbox", "-180, 180, -90, 90"));

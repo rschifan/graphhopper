@@ -928,9 +928,9 @@ public class GraphHopper implements GraphHopperAPI {
         } else if ("short_fastest".equalsIgnoreCase(weightingStr)) {
             weighting = new ShortFastestWeighting(encoder, hintsMap);
         } else if ("mindful".equalsIgnoreCase(weightingStr)) {
-            weighting = new MindfulWeighting(encoder);
+            weighting = new MindfulWeighting(hintsMap, encoder, this);
         } else if ("vibrant".equalsIgnoreCase(weightingStr)) {
-            weighting = new VibrantWeighting(hintsMap, encoder);
+            weighting = new VibrantWeighting(hintsMap, encoder, this);
         }
 
         if (weighting == null)
@@ -1283,5 +1283,11 @@ public class GraphHopper implements GraphHopperAPI {
     public void setNonChMaxWaypointDistance(int nonChMaxWaypointDistance) {
         this.nonChMaxWaypointDistance = nonChMaxWaypointDistance;
     }
+
+
+     public long getOSMWay(int internalEdgeId) {
+        return 0;
+     }
+
 
 }

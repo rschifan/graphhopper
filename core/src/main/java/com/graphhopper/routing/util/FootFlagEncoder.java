@@ -349,6 +349,7 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
             weightToPrioMap.put(100d, PREFER.getValue());
 
         double maxSpeed = getMaxSpeed(way);
+//        System.out.println("FootFlagEncoder:collect "+maxSpeed);
         if (safeHighwayTags.contains(highway) || maxSpeed > 0 && maxSpeed <= 20) {
             weightToPrioMap.put(40d, PREFER.getValue());
             if (way.hasTag("tunnel", intendedValues)) {

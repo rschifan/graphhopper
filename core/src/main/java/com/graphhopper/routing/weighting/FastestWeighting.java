@@ -69,6 +69,8 @@ public class FastestWeighting extends AbstractWeighting {
         if (unfavoredEdge)
             time += headingPenalty;
 
+//        System.out.println("FastestWeighting:calcWeight "+time);
+
         return time;
     }
 
